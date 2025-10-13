@@ -1,4 +1,6 @@
 .env
 __pycache__
 .venv
-temp/
+temp/ //Переписки
+.DS_Store
+outputs/ // Результаты генерации патернов из слов переписки
