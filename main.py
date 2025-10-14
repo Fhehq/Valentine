@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 Генератор плотных облаков слов в пользовательских формах
-Версия 3.0 - Интегрированная с библиотекой wordcloud
+Версия 3.0 - Использует официальную библиотеку wordcloud из pip
 """
 
 import os
-import sys
 import random
 import math
 import time
@@ -16,23 +15,14 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import json
 
-# Добавляем путь к нашей библиотеке wordcloud
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'wordcloud_lib'))
-
+# Импортируем установленную библиотеку wordcloud
 try:
     from wordcloud import WordCloud as BaseWordCloud, STOPWORDS, random_color_func
     WORDCLOUD_AVAILABLE = True
-    print("✓ Библиотека wordcloud успешно загружена (локальная версия)")
+    print("✓ Библиотека wordcloud успешно загружена")
 except ImportError as e:
-    try:
-        # Если локальная версия не работает, пробуем установленную
-        sys.path.pop(0)  # Убираем локальный путь
-        from wordcloud import WordCloud as BaseWordCloud, STOPWORDS, random_color_func
-        WORDCLOUD_AVAILABLE = True
-        print("✓ Библиотека wordcloud успешно загружена (установленная версия)")
-    except ImportError:
-        WORDCLOUD_AVAILABLE = False
-        print(f"Предупреждение: wordcloud не найден ни локально, ни в системе: {e}")
+    WORDCLOUD_AVAILABLE = False
+    print(f"Ошибка: wordcloud не установлен. Установите через: pip install wordcloud")
 
 
 class DenseWordCloudGenerator:
@@ -71,23 +61,16 @@ class DenseWordCloudGenerator:
         """Инициализирует шрифты для разных размеров"""
         self.fonts = {}
         try:
-            # Пытаемся использовать шрифт из wordcloud_lib
-            wordcloud_font = os.path.join(os.path.dirname(__file__), 'wordcloud_lib', 'DroidSansMono.ttf')
-            
-            if self.font_path and os.path.exists(self.font_path):
-                font_to_use = self.font_path
-            elif os.path.exists(wordcloud_font):
-                font_to_use = wordcloud_font
-            else:
-                font_to_use = None
+            font_to_use = self.font_path
             
             for size in range(self.min_font_size, self.max_font_size + 1, 2):
-                if font_to_use:
+                if font_to_use and os.path.exists(font_to_use):
                     try:
                         self.fonts[size] = ImageFont.truetype(font_to_use, size)
                     except:
                         self.fonts[size] = ImageFont.load_default()
                 else:
+                    # Пробуем системные шрифты
                     try:
                         self.fonts[size] = ImageFont.truetype("arial.ttf", size)
                     except:
@@ -158,7 +141,7 @@ class DenseWordCloudGenerator:
             'margin': self.min_spacing,  # Минимальные отступы
             'background_color': None,  # Прозрачный фон
             'mode': 'RGBA',
-            'font_path': self.font_path or os.path.join(os.path.dirname(__file__), 'wordcloud_lib', 'DroidSansMono.ttf'),
+            'font_path': self.font_path,
             'random_state': 42,
             'collocations': False,  # Отключаем коллокации для лучшего контроля
             'normalize_plurals': False,
@@ -261,7 +244,7 @@ class DenseWordCloudGenerator:
             'margin': 0,  # Минимальные отступы для максимальной плотности
             'background_color': None,
             'mode': 'RGBA',
-            'font_path': self.font_path or os.path.join(os.path.dirname(__file__), 'wordcloud_lib', 'DroidSansMono.ttf'),
+            'font_path': self.font_path,
             'random_state': 42,
             'collocations': False,
             'normalize_plurals': False,
