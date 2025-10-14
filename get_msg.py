@@ -10,14 +10,24 @@ def get_data(file_name):
     except FileNotFoundError:
         print("Файл не найден")
         return None
-    
-    
+
+
 def get_all_msg():
     file_name = "result.json"
     data = get_data(file_name)
     
+    # Проверяем, что данные загружены успешно
+    if data is None:
+        print("Данные не найдены, возвращаем пустые значения")
+        return None, []
+    
+    # Проверяем структуру данных
+    if "messages" not in data or not data["messages"]:
+        print("Структура данных некорректна или сообщения отсутствуют")
+        return None, []
+    
     all_words = []
-    first_msg = data["messages"][0]["text"]
+    first_msg = data["messages"][0]["text"] if data["messages"][0].get("text") else ""
     
     for msg in data["messages"]:
         if isinstance(msg.get("text"), str):
@@ -31,5 +41,5 @@ def get_all_msg():
                 all_words.extend(filtered_words)
 
     counter = Counter(all_words)
-    most_common_100 = counter.most_common(100)
-    return first_msg, most_common_100
+    most_common_150 = counter.most_common(200)
+    return first_msg, most_common_150
