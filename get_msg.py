@@ -4,7 +4,7 @@ from collections import Counter
 
 def get_data(file_name):
     try:
-        with open(f"temp/{file_name}", "r", encoding="utf-8") as file:
+        with open(f"{file_name}", "r", encoding="utf-8") as file:
             data = json.load(file)
             return data
     except FileNotFoundError:
@@ -12,16 +12,18 @@ def get_data(file_name):
         return None
 
 
-def get_all_msg():
-    file_name = "result.json"
+def get_all_msg(file_name=None):
+    
+    if not file_name:
+        print("Ошибка")
+        return None, None
+    
     data = get_data(file_name)
     
-    # Проверяем, что данные загружены успешно
     if data is None:
         print("Данные не найдены, возвращаем пустые значения")
         return None, []
     
-    # Проверяем структуру данных
     if "messages" not in data or not data["messages"]:
         print("Структура данных некорректна или сообщения отсутствуют")
         return None, []

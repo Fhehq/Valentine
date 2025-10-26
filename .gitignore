@@ -4,3 +4,6 @@ __pycache__
 temp/
 .DS_Store
 outputs/
+config.py
+init_db.py
+users.db
