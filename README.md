@@ -29,34 +29,33 @@ Valentine превращает твои сообщения в стильные �
 
 ## 🧩 Структура проекта
 
+```
 Valentine/
-├─ app/                        # Логика бота
+├── app/                       # Логика бота
 │   ├── handlers/              # Обработчики команд
 │   │   ├── admin_handler.py
-│   │   ├── generate_photo.py
+│   │   └── generate_photo.py
 │   ├── decoder.py             # распаковывается zip файл
 │   └── user_manager.py        # ORM и работа с пользователями
-│
-├── outputs/                   # Сохранение результатов (удаляются после отправки)
+├── outputs/                   # Сохранение результатов
 ├── patterns/                  # Формы для облаков
 │   ├── heart.png
 │   ├── lighting.png
 │   ├── treygolnik.png
 │   ├── snezhinka.png
 │   └── pramoygol.png
-│
-├── temp/                      # Временные JSON-файлы (удаляются)
-│
-├── .env                       # Конфигурация окружения (в .gitignore)
+├── temp/                      # Временные JSON-файлы
+├── .env                       # Конфигурация окружения
 ├── .gitignore
 ├── bot.py                     # Основной файл Telegram бота
 ├── config.py                  # Настройки проекта
 ├── get_msg.py                 # Получение сообщений
 ├── get_photo.py               # Генерация изображений
 ├── init_db.py                 # Инициализация базы
-├── users.db                   # SQLite база (в .gitignore)
+├── users.db                   # SQLite база
 ├── requirements.txt
 └── README.md
+```
 
 ---
 
