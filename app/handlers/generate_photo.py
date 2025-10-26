@@ -44,7 +44,7 @@ def register_photo_handlers(bot):
 
         msg = bot.send_message(
             user_id,
-            f"📁 Теперь отправь ZIP-архив с перепиской (только один файл формата json)\n\n"
+            f"📁 Теперь отправь ZIP-архив с перепиской (только один файл формата json)\nСсылка как получить историю чата и сделать ZIP архив - [тут](https://t.me/valentine_guide)\n\n"
             f"Паттерн: *{os.path.splitext(selected_pattern)[0]}*",
             parse_mode="Markdown"
         )
@@ -54,11 +54,13 @@ def register_photo_handlers(bot):
         user_id = message.from_user.id
 
         if not message.document:
-            bot.send_message(user_id, "❌ Отправь именно ZIP-архив, а не текст.")
-            return
+            error_msg = bot.send_message(user_id, "❌ Отправь именно ZIP-архив, а не текст. Попробуй еще раз:")
+            bot.register_next_step_handler(error_msg, handle_zip_upload, selected_pattern)
+            return 
 
         if not message.document.file_name.lower().endswith('.zip'):
-            bot.send_message(user_id, "⚠️ Нужен файл в формате .zip.")
+            error_msg = bot.send_message(user_id, "⚠️ Нужен файл в формате .zip. Попробуй еще раз:")
+            bot.register_next_step_handler(error_msg, handle_zip_upload, selected_pattern)
             return
 
         file_info = bot.get_file(message.document.file_id)
@@ -76,10 +78,10 @@ def register_photo_handlers(bot):
             bot.send_message(user_id, "❌ В архиве должен быть только один файл — result.json.")
             return
         
+        status_msg = bot.send_message(user_id, "🧬 Генерация фото...")
+        
         if os.path.exists(zip_path):
             os.remove(zip_path)
-
-        status_msg = bot.send_message(user_id, "🧬 Генерация фото...")
 
         try:
             photo_path, first_msg = get_photo.main(

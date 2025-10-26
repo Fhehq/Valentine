@@ -95,20 +95,18 @@ class DenseWordCloudGenerator:
         return color_func
 
     def generate_custom_shape_wordcloud(self, words: List[str], pattern_path: str, 
-                                      output_path: str) -> bool:
-        """Генерирует облако слов в пользовательской форме используя wordcloud"""
+                                    output_path: str) -> bool:
+        """Генератор облака слов с оптимизацией размера файла"""
         if not WORDCLOUD_AVAILABLE:
             print("Ошибка: Библиотека wordcloud недоступна")
             return False
         
-        # Расширяем список слов для максимальной плотности
+
         expanded_words = self._expand_word_list(words, target_count=200)
         
-        # Загружаем маску
         try:
             img = Image.open(pattern_path)
             
-            # Если изображение имеет альфа-канал, используем его
             if img.mode == 'RGBA':
                 arr = np.array(img)
                 alpha = arr[:,:,3]
@@ -135,11 +133,11 @@ class DenseWordCloudGenerator:
             'max_words': len(expanded_words),
             'min_font_size': self.min_font_size,
             'max_font_size': self.max_font_size,
-            'relative_scaling': 0.5,  # Более равномерное распределение размеров
+            'relative_scaling': 0.5,
             'colormap': None,
             'color_func': color_func,
-            'prefer_horizontal': 0.8,  # Больше горизонтальных слов для плотности
-            'margin': 0,  # Минимальные отступы для максимальной плотности
+            'prefer_horizontal': 0.8,
+            'margin': 0,
             'background_color': None,
             'mode': 'RGBA',
             'font_path': self.font_path,
@@ -149,25 +147,75 @@ class DenseWordCloudGenerator:
             'include_numbers': False,
             'min_word_length': 2,
             'repeat': True,
-            'contour_width': 0,  # Убираем контуры
+            'contour_width': 0,
             'contour_color': None,
         }
         
         try:
             wordcloud = BaseWordCloud(**wordcloud_config)
-            
             wordcloud.generate_from_frequencies(word_freq)
-            
             image = wordcloud.to_image()
-            
-            image.save(output_path, 'PNG', optimize=False, compress_level=0)
-            
-            print(f"Облако слов в форме создано: {output_path}")
-            return True
+
+            return self._optimize_and_save_image(image, output_path)
             
         except Exception as e:
             print(f"Ошибка при создании облака слов: {e}")
             return False
+
+    def _optimize_and_save_image(self, image: Image.Image, output_path: str) -> bool:
+        """Оптимизирует и сохраняет изображение с минимальным размером файла"""
+        try:
+            image.save(
+                output_path, 
+                'PNG', 
+                optimize=True,
+                compress_level=6,
+            )
+            file_size = os.path.getsize(output_path)
+            print(f"Размер файла после сохранения: {file_size} байт ({file_size/1024:.1f} KB)")
+            
+            if file_size > 2 * 1024 * 1024:
+                print("Файл слишком большой, применяем дополнительную оптимизацию...")
+                return self._further_optimize_image(image, output_path)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Ошибка при сохранении изображения: {e}")
+            return False
+
+    def _further_optimize_image(self, image: Image.Image, output_path: str) -> bool:
+        try:
+            if image.mode == 'RGBA':
+                image = image.convert('RGBA')
+                
+                temp_image = image.convert('RGB')
+                temp_image = temp_image.convert('P', palette=Image.ADAPTIVE, colors=128)
+                alpha = image.split()[-1]
+                mask = Image.eval(alpha, lambda a: 255 if a > 0 else 0)
+                temp_image.putalpha(mask)
+                
+                image = temp_image
+            
+            image.save(
+                output_path,
+                'PNG',
+                optimize=True,
+                compress_level=9,
+            )
+            
+            final_size = os.path.getsize(output_path)
+            print(f"Размер после дополнительной оптимизации: {final_size} байт ({final_size/1024:.1f} KB)")
+            
+            return True
+        
+        except Exception as e:
+            print(f"Ошибка дополнительной оптимизации: {e}")
+            try:
+                image.save(output_path, 'PNG', optimize=True, compress_level=9)
+                return True
+            except:
+                return False
 
 def get_words_from_messages(file_name) -> List[str]:
     """Получает слова из сообщений используя существующий модуль"""
@@ -189,13 +237,12 @@ def main(user_id=0, pattern=None, file=None):
         return None, None
 
     pattern = f"{pattern}.png"
-
-    # Конфигурация
+    
     config = {
         'width': 600,
         'height': 600,
         'min_font_size': 6,
-        'max_font_size': 100,  # оставляем твой размер
+        'max_font_size': 100,
         'min_spacing': 1,
         'max_rotation': 45,
         'patterns_dir': 'patterns',
@@ -203,7 +250,7 @@ def main(user_id=0, pattern=None, file=None):
         'font_path': None,
     }
 
-    os.makedirs(config['output_dir'], exist_ok=True)  # создаём папку outputs
+    os.makedirs(config['output_dir'], exist_ok=True)
 
     words, first_msg = get_words_from_messages(file_name=file)
     if words is None:
