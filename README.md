@@ -34,6 +34,7 @@ Valentine/
 │   ├── handlers/              # Обработчики команд
 │   │   ├── admin_handler.py
 │   │   ├── generate_photo.py
+│   ├── decoder.py             # распаковывается zip файл
 │   └── user_manager.py        # ORM и работа с пользователями
 │
 ├── outputs/                   # Сохранение результатов (удаляются после отправки)

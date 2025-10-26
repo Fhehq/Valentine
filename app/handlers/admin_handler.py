@@ -11,12 +11,23 @@ def register_admin_handlers(bot):
         spam = types.InlineKeyboardButton("✉️ Рассылка", callback_data="spam") 
         add_admin = types.InlineKeyboardButton("✅ Добавить админа", callback_data="add_admin") 
         del_admin = types.InlineKeyboardButton("❌ Удалить админа", callback_data="del_admin") 
-        markup.add(spam)
+        users = types.InlineKeyboardButton("👫 Кол-во Юзеров", callback_data="users")
+        markup.add(spam, users)
         markup.add(add_admin, del_admin)
         bot.send_message(message.chat.id, "👋🏿 Добро пожаловать в Админ меню", reply_markup=markup)
 
-    # Рассылка
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "users")
+    def get_all_users(call):
+        user_id = call.from_user.id
+        if not user_manager.is_admin(user_id):
+            bot.send_message(call.message.chat.id, "❌ У вас нет доступа к этой команде")
+            return
+        all_users = len(user_manager.get_users())
+        bot.send_message(call.message.chat.id, f"📊 Кол-во юзеров - {all_users}")
+        
     @bot.callback_query_handler(func=lambda call: call.data == "spam")
+    
     def start_broadcast(call):
         user_id = call.from_user.id
         chat_id = call.message.chat.id
@@ -47,7 +58,6 @@ def register_admin_handlers(bot):
 
         bot.send_message(message.chat.id, f"✅ Рассылка завершена для {len(users)} пользователей")
 
-    # Добавление / удаление админа
     @bot.callback_query_handler(func=lambda call: call.data in ["add_admin", "del_admin"])
     def add_del_admin(call):
         user_id = call.from_user.id
