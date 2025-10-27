@@ -62,3 +62,43 @@ class UserManager:
                 (user_id,)
             )
             conn.commit()
+    
+    def get_limits(self, user_id: int) -> bool:
+        if self.is_admin(user_id=user_id):
+            return True
+        
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT limits FROM users WHERE id = ?", (user_id,))
+            row = cursor.fetchone()
+            
+        if row is None:
+            return False
+        return row[0] < 3
+    
+    def increment_limits(self, user_id: int) -> None:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE users SET limits = limits + 1 WHERE id = ?",
+                    (user_id,)
+                )
+                conn.commit()
+                return
+            
+        except Exception as e:
+            print(f"Ошибка при увеличении лимитов: {e}")
+            return
+    
+    def reset_all_limits(self) -> bool:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE users SET limits = 0")
+                conn.commit()                
+                return True
+        except Exception as e:
+            print(f"Ошибка при сбросе лимитов: {e}")
+            return False
+        

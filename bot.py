@@ -10,12 +10,14 @@ from app.user_manager import UserManager
 
 from app.handlers.generate_photo import register_photo_handlers
 from app.handlers.admin_handler import register_admin_handlers
+from app.reset_limits import start_nightly_reset_scheduler
 print("Бот запущен")
 
 user_manager = UserManager()
 
 register_photo_handlers(bot)
 register_admin_handlers(bot)
+start_nightly_reset_scheduler(user_manager=user_manager, reset_time="00:00")
 
 @bot.message_handler(commands=["start"])
 def main(message):

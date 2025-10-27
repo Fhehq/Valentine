@@ -19,3 +19,4 @@ scipy>=1.7.0
 
 #Бот
 telebot>=4.14.0
+schedule>=1.2.2
