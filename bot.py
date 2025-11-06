@@ -1,37 +1,54 @@
-import time
-import requests
-from urllib3.exceptions import ProtocolError
 import os
 
-from telebot import types
+import asyncio
+import logging
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 
-from config import bot
 from app.user_manager import UserManager
-
 from app.handlers.generate_photo import register_photo_handlers
 from app.handlers.admin_handler import register_admin_handlers
+from app.handlers.profile import register_profile_handlers
 from app.reset_limits import start_nightly_reset_scheduler
-print("Бот запущен")
+from app.utils.logger import setup_logging, get_logger
+from config import BOT_TOKEN
+
+setup_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
+
+logger = get_logger(__name__)
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
+dp = Dispatcher()
 
 user_manager = UserManager()
 
-register_photo_handlers(bot)
-register_admin_handlers(bot)
+register_photo_handlers(dp, user_manager)
+register_admin_handlers(dp, user_manager)
+register_profile_handlers(dp, user_manager)
+
 start_nightly_reset_scheduler(user_manager=user_manager, reset_time="00:00")
 
-@bot.message_handler(commands=["start"])
-def main(message):
-    print("Получена команда - Start")
-    "Главное меню"""
+
+@dp.message(Command("start"))
+async def main(message: types.Message):
+    """Главное меню"""
+    logger.info(f"Получена команда /start от пользователя {message.from_user.id}")
     user_id = int(message.chat.id)
-    if user_manager.is_new_user(user_id=user_id):
-        user_manager.add_user(user_id=user_id)
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    get_photo = types.KeyboardButton('📷 Сгенерировать фото')
-    keyboard.add(get_photo)
-    if user_manager.is_admin(user_id=user_id):
-        admin_menu = types.KeyboardButton('⚙️ Админ меню')
-        keyboard.add(admin_menu)
+    if await user_manager.is_new_user(user_id=user_id):
+        await user_manager.add_user(user_id=user_id)
+    
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text='📷 Сгенерировать фото')],
+            [KeyboardButton(text='🔍 Профиль')]
+        ],
+        resize_keyboard=True
+    )
+    
+    if await user_manager.is_admin(user_id=user_id):
+        keyboard.keyboard.append([KeyboardButton(text='⚙️ Админ меню')])
 
     text = (
         "✨ *Добро пожаловать!* ✨\n\n"
@@ -45,28 +62,29 @@ def main(message):
         "🚀 Начните творить прямо сейчас!```"
     )
 
-    bot.send_message(
-        message.chat.id,
+    await message.answer(
         text=text,
-        parse_mode='Markdown',
         reply_markup=keyboard
     )
 
-while True:
+
+async def main_async():
+    """Основная асинхронная функция запуска бота"""
     try:
-        bot.polling(
-            none_stop=True,
-            timeout=10,
-            long_polling_timeout=10,
-            interval=2
-        )
-
-    except (requests.exceptions.ConnectionError, ProtocolError, TimeoutError):
-        print("Переподключение к серверам Telegram...")
-        time.sleep(15)
-        continue
-
+        logger.info("Запуск бота...")
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     except Exception as e:
-        print(f"Ошибка: {type(e).__name__}: {e}")
-        time.sleep(15)
-        continue
+        logger.error(f"Ошибка при запуске бота: {type(e).__name__}: {e}")
+    finally:
+        await bot.session.close()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main_async())
+    except KeyboardInterrupt:
+        logger.info("Бот остановлен пользователем")
+    except Exception as e:
+        logger.error(f"Критическая ошибка: {type(e).__name__}: {e}", exc_info=True)
+        logger.info("Переподключение к серверам Telegram...")
+        asyncio.run(main_async())

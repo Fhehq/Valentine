@@ -34,47 +34,33 @@ Valentine/
 ├── app/                       # Логика бота
 │   ├── handlers/              # Обработчики команд
 │   │   ├── admin_handler.py
+│   │   ├── admin_handler.py
 │   │   └── generate_photo.py
 │   ├── decoder.py             # распаковывается zip файл
+│   ├── utils/                 # утилиты
+│   │   └── logger.py          # конфиг логов
 │   └── user_manager.py        # ORM и работа с пользователями
-├── outputs/                   # Сохранение результатов
+├── outputs/                   # Сохранение результатов (в gitignore)
 ├── patterns/                  # Формы для облаков
 │   ├── heart.png
 │   ├── lighting.png
 │   ├── treygolnik.png
 │   ├── snezhinka.png
 │   └── pramoygol.png
-├── temp/                      # Временные JSON-файлы
-├── .env                       # Конфигурация окружения
+├── logs/ логи (в gitignore)
+├── temp/                      # Временные JSON-файлы (в gitignore) 
+├── .env                       # Конфигурация окружения (в gitignore)
 ├── .gitignore
 ├── bot.py                     # Основной файл Telegram бота
-├── config.py                  # Настройки проекта
-├── get_msg.py                 # Получение сообщений
-├── get_photo.py               # Генерация изображений
-├── init_db.py                 # Инициализация базы
-├── users.db                   # SQLite база
+├── config.py                  # Конфиг
+├── get_msg.py                 # Получение сообщений 
+├── get_photo.py               # Генерация изображений (в gitignore)
+├── init_db.py                 # Инициализация базы (в gitignore)
+├── users.db                   # бд (в gitignore)
 ├── requirements.txt
 └── README.md
 ```
 
----
-
-## 📂 Автоматические папки
-
-- `temp/` — временные JSON-файлы (игнорируется git)  
-- `outputs/` — результаты генерации (игнорируется git)  
-
----
-
-## ⚙️ Требования
-
-- Python **3.7+**  
-- **Pillow**  
-- **numpy**  
-- **matplotlib**  
-- **wordcloud**
-
----
 
 ## 💡 Благодарности
 

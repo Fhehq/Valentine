@@ -1,5 +1,8 @@
 import zipfile
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 def extract_zip(zip_path):
     extract_to = "temp"
@@ -10,20 +13,21 @@ def extract_zip(zip_path):
             files = zip_ref.namelist()
             
             if len(files) != 1:
-                print("❌ Ошибка: в архиве должен быть только один файл — result.json")
+                logger.error(f"В архиве должен быть только один файл — result.json. Найдено файлов: {len(files)}")
                 return None
 
             filename = files[0]
             zip_ref.extractall(extract_to)
+            logger.debug(f"Архив успешно распакован: {filename}")
             return os.path.join(extract_to, filename)
 
     except zipfile.BadZipFile:
-        print("❌ Ошибка: файл не является ZIP-архивом или поврежден")
+        logger.error(f"Файл не является ZIP-архивом или поврежден: {zip_path}")
     except FileNotFoundError:
-        print(f"❌ Ошибка: файл {zip_path} не найден")
+        logger.error(f"Файл не найден: {zip_path}")
     except IndexError:
-        print("❌ Ошибка: архив пустой")
+        logger.error("Архив пустой")
     except Exception as e:
-        print(f"❌ Произошла ошибка: {e}")
+        logger.error(f"Произошла ошибка при распаковке архива {zip_path}: {e}", exc_info=True)
     
     return None

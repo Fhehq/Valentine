@@ -18,5 +18,7 @@ regex>=2022.0.0
 scipy>=1.7.0
 
 #Бот
-telebot>=4.14.0
+aiogram>=3.0.0
 schedule>=1.2.2
+python-dotenv>=1.0.0
+aiosqlite>=0.19.0

@@ -1,125 +1,173 @@
-from telebot import types
+from aiogram import Dispatcher, types, F
+from aiogram.filters import StateFilter
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import FSInputFile
 import os
 import sys
+import asyncio
 sys.path.append(os.getcwd())
 import get_photo
 from app.decoder import extract_zip
 from app.user_manager import UserManager
+from app.utils.logger import get_logger
 
-user_manager = UserManager()
+logger = get_logger(__name__)
 
-def register_photo_handlers(bot):
-    @bot.message_handler(func=lambda m: m.text == '📷 Сгенерировать фото')
-    def choose_pattern(message):
+
+class PhotoGenerationStates(StatesGroup):
+    waiting_for_zip = State()
+
+
+def register_photo_handlers(dp: Dispatcher, user_manager: UserManager):
+    @dp.message(F.text == '📷 Сгенерировать фото')
+    async def choose_pattern(message: types.Message):
         user_id = message.chat.id
-        if user_manager.get_limits(user_id=user_id):
+        logger.info(f"Пользователь {user_id} запросил генерацию фото")
+        if await user_manager.get_limits(user_id=user_id):
             patterns_dir = 'patterns'
             pattern_files = [f for f in os.listdir(patterns_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
 
             if not pattern_files:
-                bot.send_message(message.chat.id, "⚠️ Паттерны не найдены, обратитесь в поддержку.")
+                await message.answer("⚠️ Паттерны не найдены, обратитесь в поддержку.")
                 return
-            msg_text = "✨ Выберите нужный паттерн\n\n"
             
+            msg_text = "✨ Выберите нужный паттерн\n\n"
             for idx, pattern in enumerate(pattern_files, start=1):
                 msg_text += f"{idx}: {os.path.splitext(pattern)[0]}\n"
 
-            markup = types.InlineKeyboardMarkup(row_width=3)
-            buttons = [
-                types.InlineKeyboardButton(str(i), callback_data=f"pattern_{i-1}")
-                for i in range(1, len(pattern_files) + 1)
-            ]
-            markup.add(*buttons)
+            buttons = []
+            for i in range(0, len(pattern_files), 3):
+                row = [
+                    types.InlineKeyboardButton(text=str(j+1), callback_data=f"pattern_{j}")
+                    for j in range(i, min(i+3, len(pattern_files)))
+                ]
+                buttons.append(row)
+            
+            markup = types.InlineKeyboardMarkup(inline_keyboard=buttons)
 
-            bot.send_message(message.chat.id, msg_text, reply_markup=markup)
+            await message.answer(msg_text, reply_markup=markup)
         else:
-            bot.send_message(message.chat.id, "😢 У вас закончились лимиты, приходите завтра")
+            await message.answer("😢 У вас закончились лимиты, приходите завтра")
 
-    @bot.callback_query_handler(func=lambda call: call.data.startswith('pattern_'))
-    def handle_pattern_choice(call):
-        index = int(call.data.split('_')[1])
+    @dp.callback_query(F.data.startswith('pattern_'))
+    async def handle_pattern_choice(callback: types.CallbackQuery, state: FSMContext):
+        index = int(callback.data.split('_')[1])
         patterns_dir = 'patterns'
         pattern_files = [f for f in os.listdir(patterns_dir)]
-        user_id = call.from_user.id
-        if user_manager.get_limits(user_id=user_id):
+        user_id = callback.from_user.id
+        
+        if await user_manager.get_limits(user_id=user_id):
             if index >= len(pattern_files):
-                bot.answer_callback_query(call.id, "❌ Ошибка выбора")
+                await callback.answer("❌ Ошибка выбора", show_alert=True)
                 return
 
             selected_pattern = pattern_files[index]
-            bot.answer_callback_query(call.id, f"✅ Вы выбрали: {selected_pattern}")
+            await callback.answer(f"✅ Вы выбрали: {selected_pattern}")
 
-            msg = bot.send_message(
-                user_id,
-                f"📁 Теперь отправь ZIP-архив с перепиской (только один файл формата json)\nСсылка как получить историю чата и сделать ZIP архив - [тут](https://t.me/valentine_guide)\n\n"
+            await state.update_data(selected_pattern=selected_pattern)
+            await callback.message.edit_text(
+                f"📁 Теперь отправь ZIP-архив с перепиской (только один файл формата json)\n"
+                f"Ссылка как получить историю чата и сделать ZIP архив - [тут](https://t.me/valentine_guide)\n\n"
                 f"Паттерн: *{os.path.splitext(selected_pattern)[0]}*",
                 parse_mode="Markdown"
             )
-            bot.register_next_step_handler(msg, handle_zip_upload, selected_pattern)
+            await state.set_state(PhotoGenerationStates.waiting_for_zip)
         else:
-            bot.send_message(user_id, "😢 У вас закончились лимиты, приходите завтра")
-    
-    def handle_zip_upload(message, selected_pattern):
+            await callback.answer("😢 У вас закончились лимиты, приходите завтра", show_alert=True)
+
+    @dp.message(StateFilter(PhotoGenerationStates.waiting_for_zip))
+    async def handle_zip_upload(message: types.Message, state: FSMContext):
         user_id = message.from_user.id
-        if user_manager.get_limits(user_id=user_id):
-            if not message.document:
-                error_msg = bot.send_message(user_id, "❌ Отправь именно ZIP-архив, а не текст. Попробуй еще раз:")
-                bot.register_next_step_handler(error_msg, handle_zip_upload, selected_pattern)
-                return 
+        
+        if not await user_manager.get_limits(user_id=user_id):
+            await message.answer("😢 У вас закончились лимиты, приходите завтра")
+            await state.clear()
+            return
 
-            if not message.document.file_name.lower().endswith('.zip'):
-                error_msg = bot.send_message(user_id, "⚠️ Нужен файл в формате .zip. Попробуй еще раз:")
-                bot.register_next_step_handler(error_msg, handle_zip_upload, selected_pattern)
-                return
+        if not message.document:
+            await message.answer("❌ Отправь именно ZIP-архив, а не текст. Попробуй еще раз:")
+            return
 
-            file_info = bot.get_file(message.document.file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
+        if not message.document.file_name.lower().endswith('.zip'):
+            await message.answer("⚠️ Нужен файл в формате .zip. Попробуй еще раз:")
+            return
+
+        data = await state.get_data()
+        selected_pattern = data.get("selected_pattern")
+        
+        if not selected_pattern:
+            await message.answer("❌ Ошибка: паттерн не найден. Начните заново.")
+            await state.clear()
+            return
+
+        try:
+            file = await message.bot.get_file(message.document.file_id)
+            downloaded_file = await message.bot.download_file(file.file_path)
 
             temp_dir = 'temp'
             os.makedirs(temp_dir, exist_ok=True)
             zip_path = os.path.join(temp_dir, f"{user_id}.zip")
 
-            with open(zip_path, 'wb') as new_file:
-                new_file.write(downloaded_file)
+            file_data = downloaded_file.read()
+            def save_file(path, data):
+                with open(path, 'wb') as f:
+                    f.write(data)
+            await asyncio.to_thread(save_file, zip_path, file_data)
 
-            json_path = extract_zip(zip_path)
+            json_path = await asyncio.to_thread(extract_zip, zip_path)
             if not json_path or not os.path.exists(json_path):
-                bot.send_message(user_id, "❌ В архиве должен быть только один файл — result.json.")
+                await message.answer("❌ В архиве должен быть только один файл — result.json.")
+                if os.path.exists(zip_path):
+                    await asyncio.to_thread(os.remove, zip_path)
+                await state.clear()
                 return
             
-            status_msg = bot.send_message(user_id, "🧬 Генерация фото...")
+            status_msg = await message.answer("🧬 Генерация фото...")
+            logger.info(f"Начало генерации фото для пользователя {user_id}, паттерн: {selected_pattern}")
             
             if os.path.exists(zip_path):
-                os.remove(zip_path)
+                await asyncio.to_thread(os.remove, zip_path)
 
+            photo_path = None
             try:
-                photo_path, first_msg = get_photo.main(
+                photo_path, first_msg = await asyncio.to_thread(
+                    get_photo.main,
                     user_id=user_id,
                     pattern=os.path.splitext(selected_pattern)[0],
                     file=json_path
                 )
 
-                with open(photo_path, 'rb') as photo:
-                    bot.send_document(
-                        user_id,
-                        photo,
+                if photo_path and os.path.exists(photo_path):
+                    document = FSInputFile(photo_path)
+                    await message.bot.send_document(
+                        chat_id=user_id,
+                        document=document,
                         caption=f"🎉 Облако слов сгенерировано успешно!\n\n✨ Первое сообщение:\n'{first_msg}'"
                     )
-                user_manager.increment_limits(user_id=user_id)
+                    await user_manager.increment_limits(user_id=user_id)
+                    logger.info(f"Фото успешно сгенерировано и отправлено пользователю {user_id}")
+                else:
+                    await message.answer("❌ Ошибка: не удалось создать фото")
 
             except Exception as e:
-                print(e)
-                bot.send_message(user_id, f"❌ Ошибка при генерации: {e}")
+                logger.error(f"Ошибка при генерации фото для пользователя {user_id}: {e}", exc_info=True)
+                await message.answer(f"❌ Ошибка при генерации: {e}")
 
             finally:
                 try:
-                    bot.delete_message(user_id, status_msg.message_id)
+                    await message.bot.delete_message(user_id, status_msg.message_id)
                 except Exception as e:
-                    print(f"Не удалось удалить сообщение о генерации: {e}")
+                    logger.warning(f"Не удалось удалить сообщение о генерации для пользователя {user_id}: {e}")
 
                 if os.path.exists(json_path):
-                    os.remove(json_path)
-                if os.path.exists(photo_path):
-                    os.remove(photo_path)
-        else:
-            bot.send_message(user_id, "😢 У вас закончились лимиты, приходите завтра")
+                    await asyncio.to_thread(os.remove, json_path)
+                if photo_path and os.path.exists(photo_path):
+                    await asyncio.to_thread(os.remove, photo_path)
+            
+            await state.clear()
+            
+        except Exception as e:
+            logger.error(f"Ошибка при обработке файла для пользователя {user_id}: {e}", exc_info=True)
+            await message.answer(f"❌ Произошла ошибка при обработке файла: {e}")
+            await state.clear()
